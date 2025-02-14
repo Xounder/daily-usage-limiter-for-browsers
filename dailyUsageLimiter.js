@@ -36,6 +36,7 @@
     let warnings = { "30min": false, "15min": false, "5min": false, "1min": false };
 
     let isAdminPanelOpen = false;
+    let isAdmin = false;
     let usageInterval;
     let lastUrl;
     let urlDiffCheckAttempts = maxCheckAttempts;
@@ -45,8 +46,8 @@
     });
 
     document.addEventListener('keydown', function(event) {
-        const key = "*";
-        if (event.key === key.toLowerCase() || event.key === key.toUpperCase()) {
+        const openCloseAdminPanelKey = "*";
+        if (event.key === openCloseAdminPanelKey.toLowerCase() || event.key === openCloseAdminPanelKey.toUpperCase()) {
             if (!isAdminPanelOpen) {
                 const time = Math.max(0, maxUsageTime - GM_getValue("usageData").timeUsed);
                 endUserSession(time);
@@ -54,6 +55,24 @@
                 closeAdminPanelContainer();
                 location.reload();
             }
+        }
+
+        const showAdminContentKey = "p";
+        if (
+            (event.key.toLowerCase() === showAdminContentKey && event.shiftKey) ||
+            (event.key.toUpperCase() === showAdminContentKey && event.shiftKey)
+        ) {
+                isAdmin = true;
+                endUserSession();
+        }
+
+        const showRemainingTimeKey = "t";
+        if (
+            (event.key.toLowerCase() === showRemainingTimeKey && event.shiftKey) ||
+            (event.key.toUpperCase() === showRemainingTimeKey && event.shiftKey)
+        ) {
+            const remainingTime = Math.max(maxUsageTime - GM_getValue("usageData").timeUsed, 0);
+            displayRemainingTime(remainingTime, false);
         }
     });
 
@@ -214,7 +233,60 @@
         }
     }
 
-    function createLanHouseContainer() {
+    function createAdminPasswordContainers(time) {
+        const adminPasswordDiv = document.createElement("div");
+        Object.assign(adminPasswordDiv.style, {
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "10px 0",
+            border: "1px solid rgba(0, 0, 0, 0.3)",
+            borderRadius: "2px",
+            padding: "20px",
+            fontSize: "16px",
+            backgroundColor: "#F5F5F5",
+            color: "black",
+        });
+
+        const { h2: adminPasswordInfo } = createH2("Senha do Administrador", "0");
+        adminPasswordDiv.appendChild(adminPasswordInfo);
+
+        const { div: adminPasswordInputDiv } = createDiv("row", "0 10px");
+        const { div: passwordDiv } = createDiv("row", "0 10px");
+        const { label: passwordLabel } = createLabel("Senha:");
+        const { input: passwordInput } = createInput("Insira a senha", "200px", "30px", "password");
+        const { button: passwordConfirmButton } = createButton("Confirmar", "100px", "40px", "#00533C", "#004B36")
+
+        passwordDiv.appendChild(passwordLabel);
+        passwordDiv.appendChild(passwordInput);
+        adminPasswordInputDiv.appendChild(passwordDiv);
+        adminPasswordInputDiv.appendChild(passwordConfirmButton);
+        adminPasswordDiv.appendChild(adminPasswordInputDiv);
+
+        passwordConfirmButton.addEventListener("click", () => {
+            const password = passwordInput.value;
+            if (isCorrectPassword(password)) {
+                alert("Login realizado com sucesso!");
+                sessionStorage.setItem("inputedPassword", password);
+                adminPasswordDiv.style.display = "none";
+
+                renderAllowedTable(allowedSitesTable, true);
+                renderAllowedTable(allowedChannelsTable, false);
+            } else {
+                if (password){
+                    alert("A senha inserida está incorreta!");
+                    passwordInput.value = "";
+                } else {
+                    alert("Insira a senha antes de confimar!");
+                }
+            }
+        });
+
+        return { adminPasswordDiv, passwordInput};
+    }
+
+    function createLanHouseContainer(adminPanelContainer, passwordInput) {
         const lanHouseContainer = document.createElement("div");
         Object.assign(lanHouseContainer.style, {
             display: "flex",
@@ -231,7 +303,7 @@
             backgroundColor: "#F5F5F5",
         });
 
-        const { h2: lanText } = createH2("Adicionar Tempo", "0");
+        const { h2: lanText } = createH2("Definir o Tempo de uso", "0");
         lanHouseContainer.appendChild(lanText);
 
         const { label: timeLabel } = createLabel("Tempo:");
@@ -250,6 +322,39 @@
         buttonsDiv.appendChild(cancelButton);
         lanHouseContainer.appendChild(buttonsDiv);
 
+        submitButton.addEventListener("click", () => {
+            const time = timeInput.value;
+            const password = sessionStorage.getItem("inputedPassword");
+
+            renderAllowedTable(allowedSitesTable, true);
+            renderAllowedTable(allowedChannelsTable, false);
+            if (!password) {
+                alert("Primeiro faça login como Administrador!")
+                return;
+            }
+
+            if (!time) {
+                alert("Insira o tempo em minutos que deseja definir!");
+                return;
+            }
+
+            if (isCorrectPassword(password)) {
+                alert(`Tempo definido para ${time} ${getMinuteWord(parseInt(time))}!`);
+                resetTimer(time);
+                closeAdminPanelContainer(adminPanelContainer);
+                window.location.href = window.location.href;
+            } else {
+                alert("Somente Administradores podem definir o tempo!");
+                passwordInput.value = "";
+                timeInput.value = "";
+            }
+        });
+
+        cancelButton.addEventListener("click", () => {
+            window.location.href = "https://scratch.mit.edu";
+            closeAdminPanelContainer(adminPanelContainer);
+        });
+
         return { lanHouseContainer, timeInput, submitButton, cancelButton };
     }
 
@@ -261,7 +366,7 @@
             justifyContent: "center",
             alignItems: "center",
             gap: "20px 0",
-            width: "500px",
+            width: "800px",
             border: "2px solid black",
             borderRadius: "5px",
             padding: "20px",
@@ -289,6 +394,43 @@
         solicitationButtonsDiv.appendChild(solicitationAcceptButton);
         solicitationIncludeDiv.appendChild(solicitationButtonsDiv);
         solicitationContainer.appendChild(solicitationIncludeDiv);
+
+        const currentDomain = window.location.hostname;
+        const allowedSites = GM_getValue("allowedSites", []);
+        const pendingSites = GM_getValue("pendingSites", []);
+        const allowedChannels = GM_getValue("allowedChannels", []);
+        const pendingChannels = GM_getValue("pendingChannels", []);
+        const channelName = getYoutubeChannelName();
+
+        if (pendingSites.includes(currentDomain) || pendingChannels.includes(channelName) || allowedSites.includes(currentDomain) || allowedChannels.includes(currentDomain) || isMainLinkYoutube()) {
+            solicitationIncludeDiv.style.display = "none";
+        }
+
+        solicitationAcceptButton.addEventListener("click", () => {
+            solicitationIncludeDiv.style.display = "none";
+
+            const currentDomain = window.location.hostname;
+            let pendingSites = GM_getValue("pendingSites", []);
+            let pendingChannels = GM_getValue("pendingChannels", []);
+
+            if (currentDomain.includes("youtube.com")) {
+                let channelName = getYoutubeChannelName();
+
+                if (channelName) {
+                    pendingChannels.push(`${channelName}`);
+                    GM_setValue("pendingChannels", pendingChannels);
+                    location.reload();
+                }
+            } else {
+                pendingSites.push(currentDomain);
+                GM_setValue("pendingSites", pendingSites);
+                location.reload();
+            }
+        });
+
+        solicitationDenieButton.addEventListener("click", () => {
+            solicitationIncludeDiv.style.display = "none";
+        });
 
         return { solicitationContainer, solicitationIncludeDiv, solicitationAcceptButton, solicitationDenieButton };
     }
@@ -451,7 +593,7 @@
             opacity: "1",
             filter: "none",
             mixBlendMode: "normal",
-            zIndex: "9999",
+            zIndex: "99999999999999999999999999999999",
         });
 
         document.body.appendChild(div);
@@ -503,140 +645,36 @@
 
         const text = "Seu Tempo" + (time !== 0 ? `: ${Math.round(time + 0.5)} ${getMinuteWord(time)}!` : " Acabou!");
         const { h2: infoText } = createH2(text, "0", "24px", "white");
-
-        const adminPasswordDiv = document.createElement("div");
-        Object.assign(adminPasswordDiv.style, {
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: "10px 0",
-            border: "1px solid rgba(0, 0, 0, 0.3)",
-            borderRadius: "2px",
-            padding: "20px",
-            fontSize: "16px",
-            backgroundColor: "#F5F5F5",
-            color: "black",
-        });
-
-        const { h2: adminPasswordInfo } = createH2("Senha do Administrador", "0");
-        adminPasswordDiv.appendChild(adminPasswordInfo);
-
-        const { div: adminPasswordInputDiv } = createDiv("row", "0 10px");
-        const { div: passwordDiv } = createDiv("row", "0 10px");
-        const { label: passwordLabel } = createLabel("Senha:");
-        const { input: passwordInput } = createInput("Insira a senha", "200px", "30px", "password");
-        const { button: passwordConfirmButton } = createButton("Confirmar", "100px", "40px", "#00533C", "#004B36")
-
-        passwordDiv.appendChild(passwordLabel);
-        passwordDiv.appendChild(passwordInput);
-        adminPasswordInputDiv.appendChild(passwordDiv);
-        adminPasswordInputDiv.appendChild(passwordConfirmButton);
-        adminPasswordDiv.appendChild(adminPasswordInputDiv);
-        adminPanelContainer.appendChild(adminPasswordDiv);
         adminPanelContainer.appendChild(infoText);
 
-        const { lanHouseContainer, timeInput, submitButton, cancelButton } = createLanHouseContainer();
-        const { solicitationContainer, solicitationIncludeDiv, solicitationAcceptButton, solicitationDenieButton } = createSolicitationContainer();
+        const { adminPasswordDiv, passwordInput } = createAdminPasswordContainers(time);
+        const { lanHouseContainer } = createLanHouseContainer(adminPanelContainer, passwordInput);
+        const { solicitationContainer } = createSolicitationContainer();
         const { allowedContainer: allowedSitesContainer } = createAllowedContainer(allowedSitesTable, "Sites Permitidos/Pendentes", allowedSitesTable, true);
         const { allowedContainer: allowedChanellsContainer } = createAllowedContainer(allowedChannelsTable, "Canais Permitidos/Pendentes", allowedChannelsTable, false);
-        const { div: inputsDiv } = createDiv("row", "30px 100px");
+        const { div: inputsDiv } = createDiv("row", "30px 10px");
+        const {div: allowedDiv } = createDiv("row", "30px 10px");
+        allowedDiv.style.width = "100%"
+        allowedSitesContainer.style.flex = "1";
+        allowedChanellsContainer.style.flex = "1";
 
-        solicitationContainer.appendChild(allowedSitesContainer);
-        solicitationContainer.appendChild(allowedChanellsContainer);
+        allowedDiv.appendChild(allowedSitesContainer);
+        allowedDiv.appendChild(allowedChanellsContainer);
+        solicitationContainer.appendChild(allowedDiv);
         inputsDiv.appendChild(solicitationContainer);
         inputsDiv.appendChild(lanHouseContainer);
+
+        lanHouseContainer.style.display = "none";
+        adminPasswordDiv.style.display = "none";
+
+        if (isAdmin) {
+            lanHouseContainer.style.display = "flex";
+            adminPasswordDiv.style.display = "flex";
+        }
+        
+        adminPanelContainer.appendChild(adminPasswordDiv);
         adminPanelContainer.appendChild(inputsDiv);
         document.body.appendChild(adminPanelContainer);
-
-        const currentDomain = window.location.hostname;
-        const allowedSites = GM_getValue("allowedSites", []);
-        const pendingSites = GM_getValue("pendingSites", []);
-        const allowedChannels = GM_getValue("allowedChannels", []);
-        const pendingChannels = GM_getValue("pendingChannels", []);
-        const channelName = getYoutubeChannelName();
-
-        if (pendingSites.includes(currentDomain) || pendingChannels.includes(channelName) || allowedSites.includes(currentDomain) || allowedChannels.includes(currentDomain) || isMainLinkYoutube()) {
-            solicitationIncludeDiv.style.display = "none";
-        }
-
-        solicitationAcceptButton.addEventListener("click", () => {
-            solicitationIncludeDiv.style.display = "none";
-
-            const currentDomain = window.location.hostname;
-            let pendingSites = GM_getValue("pendingSites", []);
-            let pendingChannels = GM_getValue("pendingChannels", []);
-
-            if (currentDomain.includes("youtube.com")) {
-                let channelName = getYoutubeChannelName();
-
-                if (channelName) {
-                    pendingChannels.push(`${channelName}`);
-                    GM_setValue("pendingChannels", pendingChannels);
-                    location.reload();
-                }
-            } else {
-                pendingSites.push(currentDomain);
-                GM_setValue("pendingSites", pendingSites);
-                location.reload();
-            }
-        });
-
-        solicitationDenieButton.addEventListener("click", () => {
-            solicitationIncludeDiv.style.display = "none";
-        });
-
-        passwordConfirmButton.addEventListener("click", () => {
-            const password = passwordInput.value;
-            if (isCorrectPassword(password)) {
-                alert("Login realizado com sucesso!");
-                sessionStorage.setItem("inputedPassword", password);
-                adminPasswordDiv.style.display = "none";
-
-                renderAllowedTable(allowedSitesTable, true);
-                renderAllowedTable(allowedChannelsTable, false);
-            } else {
-                if (password){
-                    alert("A senha inserida está incorreta!");
-                    passwordInput.value = "";
-                } else {
-                    alert("Insira a senha antes de confimar!");
-                }
-            }
-        });
-
-        submitButton.addEventListener("click", () => {
-            const time = timeInput.value;
-            const password = sessionStorage.getItem("inputedPassword");
-
-            renderAllowedTable(allowedSitesTable, true);
-            renderAllowedTable(allowedChannelsTable, false);
-            if (!password) {
-                alert("Primeiro faça login como Administrador!")
-                return;
-            }
-
-            if (!time) {
-                alert("Insira o tempo em minutos que deseja adicionar!");
-                return;
-            }
-
-            if (isCorrectPassword(password)) {
-                alert(`Tempo resetado para ${time} ${getMinuteWord(parseInt(time))}!`);
-                resetTimer(time);
-                closeAdminPanelContainer(adminPanelContainer);
-                window.location.href = window.location.href;
-            } else {
-                alert("Somente Administradores podem definir o tempo!");
-                passwordInput.value = "";
-                timeInput.value = "";
-            }
-        });
-
-        cancelButton.addEventListener("click", () => {
-            window.location.href = "https://scratch.mit.edu";
-            closeAdminPanelContainer(adminPanelContainer);
-        });
     }
 
     // Verifications
@@ -656,6 +694,10 @@
         if (!lastUrl) {
             lastUrl = window.location.hostname;
         }
+
+        console.log("lastURL " + lastUrl);
+        console.log(window.location.hostname);
+        console.log(getAvailableContent(true));
 
         const currentUrl = window.location.hostname;
         const allowed = GM_getValue("allowedSites");
@@ -721,7 +763,11 @@
     function checkUsageTime() {
         resetTimer();
 
-        if (isAdminPanelOpen) return;
+        if (isAdminPanelOpen){
+            return;
+        } else {
+            isAdmin = false;
+        }
 
         const usageData = GM_getValue("usageData");
         const startTime = GM_getValue("startTime");
