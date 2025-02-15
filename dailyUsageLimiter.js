@@ -13,9 +13,8 @@
 (function () {
     'use strict';
     const DEFAULT_MAX_USAGE_TIME = 120; // 2h
-    const VERIFICATION_TIME = 2
+    const VERIFICATION_TIME = 2;
     const ADMIN_PASSWORD = "BebaAwa";
-    const maxCheckAttempts = 5
     const maxUsageTime = GM_getValue("maxUsageTime", DEFAULT_MAX_USAGE_TIME);
     const allowedSites = GM_getValue("allowedSites", [
         "https://scratch.mit.edu",
@@ -38,8 +37,6 @@
     let isAdminPanelOpen = false;
     let isAdmin = false;
     let usageInterval;
-    let lastUrl;
-    let urlDiffCheckAttempts = maxCheckAttempts;
 
     window.addEventListener("beforeunload", () => {
         sessionStorage.removeItem("inputedPassword");
@@ -416,7 +413,7 @@
         solicitationIncludeDiv.appendChild(solicitationButtonsDiv);
         solicitationContainer.appendChild(solicitationIncludeDiv);
 
-        const currentDomain = window.location.hostname;
+        const currentDomain = window.location.origin;
         const channelName = getYoutubeChannelName();
 
         if (pendingSites.includes(currentDomain) || pendingChannels.includes(channelName) || allowedSites.includes(currentDomain) || allowedChannels.includes(currentDomain) || isMainLinkYoutube()) {
@@ -425,7 +422,6 @@
 
         solicitationAcceptButton.addEventListener("click", () => {
             solicitationIncludeDiv.style.display = "none";
-            const currentDomain = window.location.hostname;
 
             if (currentDomain.includes("youtube.com")) {
                 const channelName = getYoutubeChannelName();
@@ -502,7 +498,6 @@
         actionsHeader.style.display = "none";
         actionsHeader.style.border = "1px solid #ddd";
 
-        // Adicionar células à linha do cabeçalho
         headerRow.appendChild(siteHeader);
         headerRow.appendChild(actionsHeader);
         table.appendChild(headerRow);
@@ -721,7 +716,6 @@
             adminPasswordDiv.style.display = "flex";
         }
 
-        //adminPanelContainer.appendChild(adminPasswordDiv);
         adminPanelContainer.appendChild(inputsDiv);
         document.body.appendChild(adminPanelContainer);
     }
@@ -739,30 +733,12 @@
         return isAuthorizedSite();
     }
 
-    function isAuthorizedSite() {
-        if (!lastUrl) {
-            lastUrl = window.location.hostname;
-        }
-
-        console.log("lastURL " + lastUrl);
-        console.log(window.location.hostname);
-        console.log(getAvailableContent(true));
-
-        const currentUrl = window.location.hostname;
-        const allowed = GM_getValue("allowedSites");
-
-        if (urlDiffCheckAttempts > 0) {
-            if (currentUrl !== lastUrl) {
-                urlDiffCheckAttempts -= 1;
-            } else {
-                urlDiffCheckAttempts = maxCheckAttempts;
-                return allowed.some(site => currentUrl.includes(site));
-            }
+    function isAuthorizedSite() {       
+        if (window.self !== window.top) // iframes             
             return true;
-        }
-
-        urlDiffCheckAttempts = maxCheckAttempts;
-        return allowed.some(site => currentUrl.includes(site));
+                    
+        const currentUrl = window.location.hostname;
+        return allowedSites.some(site => site.includes(currentUrl));
     }
 
     function isAuthorizedChannel() {
@@ -813,9 +789,6 @@
     function checkUsageTime() {
         resetTimer();
 
-        console.log("Pending S: " + pendingSites.length)
-        console.log("Pending C: " + pendingChannels.length)
-
         if (isAdminPanelOpen){
             return;
         } else {
@@ -824,7 +797,7 @@
 
         const usageData = GM_getValue("usageData");
         const startTime = GM_getValue("startTime");
-        const currentTime = Date.now();
+        const currentTime = getAtualTimeInMilliseconds();
 
         const elapsedTimeInMinutes = (currentTime - startTime) / (60 * 1000);
         usageData.timeUsed = elapsedTimeInMinutes;
@@ -851,7 +824,7 @@
 
             const maxTime = time !== 0 ? time : 1;
             GM_setValue("maxUsageTime", maxTime);
-            GM_setValue("startTime", Date.now());
+            GM_setValue("startTime", getAtualTimeInMilliseconds());
             warnings = { "30min": false, "15min": false, "5min": false, "1min": false };
         }
     }
