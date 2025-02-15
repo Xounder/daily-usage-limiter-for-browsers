@@ -17,16 +17,31 @@
     const ADMIN_PASSWORD = "BebaAwa";
     const maxUsageTime = GM_getValue("maxUsageTime", DEFAULT_MAX_USAGE_TIME);
     const allowedSites = GM_getValue("allowedSites", [
+        "scratch.mit.edu",
+        "www.codecademy.com",
+        "www.w3schools.com",
+        "chatgpt.com"
+    ]);
+    const allowedSitesPath = GM_getValue("allowedSitesPath", [
         "https://scratch.mit.edu",
         "https://www.codecademy.com",
         "https://www.w3schools.com",
         "https://chatgpt.com"
     ]);
     const pendingSites = GM_getValue("pendingSites", []);
+    const pendingSitesPath = GM_getValue("pendingSitesPath", []);
     const allowedChannels = GM_getValue("allowedChannels", [
         "Hashtag Treinamentos",
+        "Manual do Mundo",
+        "Professor Noslen",
+    ]);
+    const allowedChannelsPath = GM_getValue("allowedChannelsPath", [
+        "@hashtagtreinamentos",
+        "@ManualdoMundo",
+        "@professornoslen",
     ]);
     const pendingChannels = GM_getValue("pendingChannels", []);
+    const pendingChannelsPath = GM_getValue("pendingChannelsPath", []);
     const mainLinkYoutube = "https://www.youtube.com/";
 
     const { table: allowedSitesTable, actionsHeader: sitesActionsHeader } = createTable("Sites");
@@ -47,7 +62,7 @@
         if (event.key === openCloseAdminPanelKey.toLowerCase() || event.key === openCloseAdminPanelKey.toUpperCase()) {
             if (!isAdminPanelOpen) {
                 const remainingTime = getRemainingTime();
-                const infoTextContent =  remainingTime !== 0 ? `Tempo Restante: ${getRoundedTime(time)} ${getMinuteWord(time)}!` : "Sessão Expirada!";
+                const infoTextContent = remainingTime !== 0 ? `Tempo Restante: ${getRoundedTime(remainingTime)} ${getMinuteWord(remainingTime)}!` : "Sessão Expirada!";
                 endUserSession(infoTextContent);
             } else {
                 closeAdminPanelContainer();
@@ -76,6 +91,64 @@
         }
     });
 
+    // Aux Functions
+
+    function updateAllowedContent(isSite) {
+        if (isSite) {
+            GM_setValue("allowedSites", allowedSites);
+            GM_setValue("allowedSitesPath", allowedSitesPath);
+        } else {
+            GM_setValue("allowedChannels", allowedChannels);
+            GM_setValue("allowedChannelsPath", allowedChannelsPath);
+        }
+    }
+
+    function updatePendingContent(isSite) {
+        if (isSite) {
+            GM_setValue("pendingSites", pendingSites);
+            GM_setValue("pendingSitesPath", pendingSitesPath);
+        } else {
+            GM_setValue("pendingChannels", pendingChannels);
+            GM_setValue("pendingChannelsPath", pendingChannelsPath);
+        }
+    }
+
+    function addAllowedContent(content, isSite) {
+        const allowedName = isSite ? allowedSites : allowedChannels;
+        const allowedPath = isSite ? allowedSitesPath : allowedChannelsPath;
+
+        allowedName.push(content.name);
+        allowedPath.push(content.path);
+        updateAllowedContent(isSite);
+    }
+
+    function removeAllowedContent(content, isSite) {
+        const allowedName = isSite ? allowedSites : allowedChannels;
+        const allowedPath = isSite ? allowedSitesPath : allowedChannelsPath;
+
+        allowedName.splice(allowedName.indexOf(content.name), 1);
+        allowedPath.splice(allowedPath.indexOf(content.path), 1);
+        updateAllowedContent(isSite);
+    }
+
+    function addPendingContent(content, isSite) {
+        const pendingName = isSite ? pendingSites : pendingChannels;
+        const pendingPath = isSite ? pendingSitesPath : pendingChannelsPath;
+
+        pendingName.push(content.name);
+        pendingPath.push(content.path);
+        updatePendingContent(isSite);
+    }
+
+    function removePendingContent(content, isSite) {
+        const pendingName = isSite ? pendingSites : pendingChannels;
+        const pendingPath = isSite ? pendingSitesPath : pendingChannelsPath;
+
+        pendingName.splice(pendingChannels.indexOf(content.name), 1);
+        pendingPath.splice(pendingChannelsPath.indexOf(content.path), 1);
+        updatePendingContent(isSite);
+    }
+
     // Getters & Setters
 
     function getRemainingTime() {
@@ -102,9 +175,19 @@
 
     function getAvailableContent(isSite) {
         if (isSite) {
-            return { available: allowedSites, pending: pendingSites };
+            return {
+                allowedNameList: allowedSites,
+                pendingNameList: pendingSites,
+                allowedPathList: allowedSitesPath,
+                pendingPathList: pendingSitesPath
+            };
         } else {
-            return { available: allowedChannels, pending: pendingChannels };
+            return {
+                allowedNameList: allowedChannels,
+                pendingNameList: pendingChannels,
+                allowedPathList: allowedChannelsPath,
+                pendingPathList: pendingChannelsPath
+            };
         }
     }
 
@@ -112,44 +195,32 @@
         return { actionsHeader: isSite ? sitesActionsHeader : channelsActionsHeader };
     }
 
-    function getYoutubeChannelName() {
+    function getYoutubeChannel() {
         const currentUrl = window.location.href;
         let channelName = "";
+        let channelPath = "";
         let channelElement;
 
-        if (currentUrl.includes("youtube.com/@")){
-            // modificar caso mude o local para encontrar o '(@<nome-canal>)' na main page do canal
-            channelElement = document.querySelector(".yt-content-metadata-view-model-wiz__metadata-row .yt-core-attributed-string--link-inherit-color");
+        const ytb = "youtube.com"
+        if (currentUrl.includes(`${ytb}/@`) || currentUrl.includes(`${ytb}/channel`)){
+            // modificar caso mude o local para encontrar o '(@<nome-canal>)' ou '(/channel/<url-canal>)' na main page do canal
+            channelElement = document.querySelector(".dynamic-text-view-model-wiz__h1 span");
 
             if (channelElement) {
                 channelName = channelElement.textContent.trim();
+                channelPath = window.location.pathname;
             }
         } else {
             // modificar  caso mude o local para encontrar o nome do canal na visualização de videos
-            const channelElement = document.querySelector("yt-formatted-string a");
-
+            channelElement = document.querySelector("ytd-channel-name yt-formatted-string a");
+            
             if (channelElement) {
-                channelName = channelElement.getAttribute("href").replace("/", "");
+                channelName = channelElement.textContent.trim();
+                channelPath = channelElement.getAttribute("href");
             }
         }
 
-        return channelName;
-    }
-
-    function setAllowedContent(allowedList, isSite) {
-        if (isSite) {
-            GM_setValue("allowedSites", allowedList);
-        } else {
-            GM_setValue("allowedChannels", allowedList);
-        }
-    }
-
-    function setPendingContent(pendingList, isSite) {
-        if (isSite) {
-            GM_setValue("pendingSites", pendingList);
-        } else {
-            GM_setValue("pendingChannels", pendingList);
-        }
+        return { channelName, channelPath };
     }
 
     // Create Html/Css
@@ -162,8 +233,8 @@
         const actionCell = row.insertCell(1);
 
         const link = document.createElement("a");
-        link.href = site;
-        link.textContent = site;
+        link.href = site.path;
+        link.textContent = site.name;
         link.target = "_blank";
         link.style.color = "rgba(0, 0, 0, 0.8)";
         link.style.fontSize = "14px";
@@ -200,11 +271,8 @@
         addButton.style.textShadow = "unset";
         addButton.style.fontSize = "14px";
         addButton.onclick = () => {
-            const { available, pending } = getAvailableContent(isSite);
-            available.push(site);
-            pending.splice(pending.indexOf(site), 1);
-            setAllowedContent(available, isSite);
-            setPendingContent(pending, isSite);
+            addAllowedContent(site, isSite);
+            removePendingContent(site, isSite);
             renderAllowedTable(table, isSite);
         };
 
@@ -218,13 +286,10 @@
         removeButton.style.textShadow = "unset";
         removeButton.style.fontSize = "14px";
         removeButton.onclick = () => {
-            const { available, pending } = getAvailableContent(isSite);
             if (isPending) {
-                pending.splice(pending.indexOf(site), 1);
-                setPendingContent(pending, isSite);
+                removePendingContent(site, isSite);
             } else {
-                available.splice(available.indexOf(site), 1);
-                setAllowedContent(available, isSite);
+                removeAllowedContent(site, isSite);
             }
             renderAllowedTable(table, isSite);
         };
@@ -414,9 +479,10 @@
         solicitationContainer.appendChild(solicitationIncludeDiv);
 
         const currentDomain = window.location.origin;
-        const channelName = getYoutubeChannelName();
+        const { channelName, channelPath } = getYoutubeChannel();
 
-        if (pendingSites.includes(currentDomain) || pendingChannels.includes(channelName) || allowedSites.includes(currentDomain) || allowedChannels.includes(currentDomain) || isMainLinkYoutube()) {
+        const contentName = currentDomain.includes("youtube.com") ? channelName : currentDomain;
+        if (isHideSolicitation(contentName)) {
             solicitationIncludeDiv.style.display = "none";
         }
 
@@ -424,16 +490,12 @@
             solicitationIncludeDiv.style.display = "none";
 
             if (currentDomain.includes("youtube.com")) {
-                const channelName = getYoutubeChannelName();
-
                 if (channelName) {
-                    pendingChannels.push(`${channelName}`);
-                    setPendingContent(pendingChannels, false);
+                    addPendingContent({ name: channelName, path: channelPath }, false);
                     showAlert("Sua solicitação foi enviada com sucesso!");
                 }
             } else {
-                pendingSites.push(currentDomain);
-                setPendingContent(pendingSites, true);
+                addPendingContent({ name: window.location.hostname, path: currentDomain }, true);
                 showAlert("Sua solicitação foi enviada com sucesso!");
             }
         });
@@ -487,8 +549,8 @@
         siteHeader.style.backgroundColor = "#04AA6D";
         siteHeader.style.padding = "8px";
         siteHeader.style.border = "1px solid #ddd";
-        
-        
+
+
         const actionsHeader = document.createElement("th");
         actionsHeader.textContent = "Ações";
         actionsHeader.style.color = "white";
@@ -645,9 +707,14 @@
             tds[0].parentNode.removeChild(tds[0]);
         }
 
-        const { available, pending } = getAvailableContent(isSite);
-        available.forEach(site => addRow(table, site, false, isSite));
-        pending.forEach(site => addRow(table, site, true, isSite));
+        const { allowedNameList, pendingNameList, allowedPathList, pendingPathList } = getAvailableContent(isSite);
+        allowedNameList.forEach((site, index) =>
+            addRow(table, { name: site, path: allowedPathList[index] }, false, isSite)
+        );
+
+        pendingNameList.forEach((site, index) =>
+            addRow(table, { name: site, path: pendingPathList[index] }, true, isSite )
+        );
     }
 
     function renderAdminPanel(infoTextContent) {
@@ -722,6 +789,12 @@
 
     // Verifications
 
+    function isHideSolicitation(contentName) {
+        if (isMainLinkYoutube() || isAdmin) return true;
+
+        return pendingSitesPath.includes(contentName) || pendingChannels.includes(contentName) || allowedSitesPath.includes(contentName) || allowedChannels.includes(contentName)
+    }
+
     function isAuthorizedContent() {
         const currentDomain = window.location.hostname
         if (currentDomain.includes("youtube.com")) {
@@ -733,19 +806,16 @@
         return isAuthorizedSite();
     }
 
-    function isAuthorizedSite() {       
-        if (window.self !== window.top) // iframes             
-            return true;
-                    
+    function isAuthorizedSite() {
+        if (window.self !== window.top) return true;
+
         const currentUrl = window.location.hostname;
         return allowedSites.some(site => site.includes(currentUrl));
     }
 
     function isAuthorizedChannel() {
-        let channelName = getYoutubeChannelName();
-        console.log("nome do canal: " + channelName);
+        let { channelName, channelPath } = getYoutubeChannel();
         if (channelName) {
-            console.log("nomesplit: " + allowedChannels.some(channel => channel === channelName));
             return allowedChannels.some(channel => channel === channelName);
         }
         return false;
