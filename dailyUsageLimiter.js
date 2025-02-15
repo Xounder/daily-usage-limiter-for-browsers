@@ -241,6 +241,8 @@
             justifyContent: "center",
             alignItems: "center",
             gap: "10px 0",
+            width: "385px",
+            height: "75px",
             border: "1px solid rgba(0, 0, 0, 0.3)",
             borderRadius: "2px",
             padding: "20px",
@@ -295,9 +297,10 @@
             alignItems: "center",
             gap: "30px 0",
             height: "200px",
-            width: "400px",
-            border: "2px solid black",
-            borderRadius: "5px",
+            width: "385px",
+            height: "200px",
+            border: "1px solid rgba(0, 0, 0, 0.3)",
+            borderRadius: "2px",
             padding: "20px",
             fontSize: "16px",
             backgroundColor: "#F5F5F5",
@@ -367,8 +370,10 @@
             alignItems: "center",
             gap: "20px 0",
             width: "800px",
-            border: "2px solid black",
-            borderRadius: "5px",
+            minHeight: "345px",
+            maxHeigth: "345px",
+            border: "1px solid rgba(0, 0, 0, 0.3)",
+            borderRadius: "2px",
             padding: "20px",
             fontSize: "16px",
             backgroundColor: "#F5F5F5",
@@ -653,6 +658,11 @@
         const { allowedContainer: allowedSitesContainer } = createAllowedContainer(allowedSitesTable, "Sites Permitidos/Pendentes", allowedSitesTable, true);
         const { allowedContainer: allowedChanellsContainer } = createAllowedContainer(allowedChannelsTable, "Canais Permitidos/Pendentes", allowedChannelsTable, false);
         const { div: inputsDiv } = createDiv("row", "30px 10px");
+
+        const { div: adminDiv } = createDiv("column", "30px 10px");
+        adminDiv.appendChild(adminPasswordDiv);
+        adminDiv.appendChild(lanHouseContainer);
+
         const {div: allowedDiv } = createDiv("row", "30px 10px");
         allowedDiv.style.width = "100%"
         allowedSitesContainer.style.flex = "1";
@@ -662,7 +672,7 @@
         allowedDiv.appendChild(allowedChanellsContainer);
         solicitationContainer.appendChild(allowedDiv);
         inputsDiv.appendChild(solicitationContainer);
-        inputsDiv.appendChild(lanHouseContainer);
+        inputsDiv.appendChild(adminDiv);
 
         lanHouseContainer.style.display = "none";
         adminPasswordDiv.style.display = "none";
@@ -671,8 +681,8 @@
             lanHouseContainer.style.display = "flex";
             adminPasswordDiv.style.display = "flex";
         }
-        
-        adminPanelContainer.appendChild(adminPasswordDiv);
+
+        //adminPanelContainer.appendChild(adminPasswordDiv);
         adminPanelContainer.appendChild(inputsDiv);
         document.body.appendChild(adminPanelContainer);
     }
