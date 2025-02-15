@@ -841,19 +841,13 @@
     function checkDisplayRemainingTime(remainingTimeInMinutes) {
         remainingTimeInMinutes = getRoundedTime(remainingTimeInMinutes);
 
-        if (remainingTimeInMinutes <= 30 && remainingTimeInMinutes > 29 && !warnings["30min"]) {
-            displayRemainingTime(30);
-            warnings["30min"] = true;
-        } else if (remainingTimeInMinutes <= 15 && remainingTimeInMinutes > 14 && !warnings["15min"]) {
-            displayRemainingTime(15);
-            warnings["15min"] = true;
-        } else if (remainingTimeInMinutes <= 5 && remainingTimeInMinutes > 4 && !warnings["5min"]) {
-            displayRemainingTime(5);
-            warnings["5min"] = true;
-        } else if (remainingTimeInMinutes <= 1 && remainingTimeInMinutes > 0 && !warnings["1min"]) {
-            displayRemainingTime(1);
-            warnings["1min"] = true;
-        }
+        const warningTimes = [30, 15, 5, 1];
+        warningTimes.forEach(time => {
+            if (remainingTimeInMinutes <= time && remainingTimeInMinutes > time - 1 && !warnings[`${time}min`]) {
+                displayRemainingTime(time);
+                warnings[`${time}min`] = true;
+            }
+        });
     }
 
     function checkUsageTime() {
