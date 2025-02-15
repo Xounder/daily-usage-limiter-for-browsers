@@ -63,8 +63,10 @@
             (event.key.toLowerCase() === showAdminContentKey && event.shiftKey) ||
             (event.key.toUpperCase() === showAdminContentKey && event.shiftKey)
         ) {
-                isAdmin = true;
-                endUserSession("Admin Mode");
+            if (!isAdminPanelOpen || isAdmin) return;
+
+            isAdmin = true;
+            endUserSession("Admin Mode");
         }
 
         const showRemainingTimeKey = "t";
@@ -137,19 +139,19 @@
         return channelName;
     }
 
-    function setAllowedContent(content, isSite) {
+    function setAllowedContent(allowedList, isSite) {
         if (isSite) {
-            GM_setValue("allowedSites", content);
+            GM_setValue("allowedSites", allowedList);
         } else {
-            GM_setValue("allowedChannels", content);
+            GM_setValue("allowedChannels", allowedList);
         }
     }
 
-    function setPendingContent(content, isSite) {
+    function setPendingContent(pendingList, isSite) {
         if (isSite) {
-            GM_setValue("pendingSites", content);
+            GM_setValue("pendingSites", pendingList);
         } else {
-            GM_setValue("pendingChannels", content);
+            GM_setValue("pendingChannels", pendingList);
         }
     }
 
@@ -345,8 +347,6 @@
             const time = timeInput.value;
             const password = sessionStorage.getItem("inputedPassword");
 
-            renderAllowedTable(allowedSitesTable, true);
-            renderAllowedTable(allowedChannelsTable, false);
             if (!password) {
                 showAlert("Primeiro faça login como Administrador!")
                 return;
@@ -417,10 +417,6 @@
         solicitationContainer.appendChild(solicitationIncludeDiv);
 
         const currentDomain = window.location.hostname;
-        const allowedSites = GM_getValue("allowedSites", []);
-        const pendingSites = GM_getValue("pendingSites", []);
-        const allowedChannels = GM_getValue("allowedChannels", []);
-        const pendingChannels = GM_getValue("pendingChannels", []);
         const channelName = getYoutubeChannelName();
 
         if (pendingSites.includes(currentDomain) || pendingChannels.includes(channelName) || allowedSites.includes(currentDomain) || allowedChannels.includes(currentDomain) || isMainLinkYoutube()) {
@@ -429,24 +425,20 @@
 
         solicitationAcceptButton.addEventListener("click", () => {
             solicitationIncludeDiv.style.display = "none";
-
             const currentDomain = window.location.hostname;
-            let pendingSites = GM_getValue("pendingSites", []);
-            let pendingChannels = GM_getValue("pendingChannels", []);
 
             if (currentDomain.includes("youtube.com")) {
-                let channelName = getYoutubeChannelName();
+                const channelName = getYoutubeChannelName();
 
                 if (channelName) {
                     pendingChannels.push(`${channelName}`);
-                    GM_setValue("pendingChannels", pendingChannels);
+                    setPendingContent(pendingChannels, false);
                     showAlert("Sua solicitação foi enviada com sucesso!");
-                    //location.reload();
                 }
             } else {
                 pendingSites.push(currentDomain);
-                GM_setValue("pendingSites", pendingSites);
-                location.reload();
+                setPendingContent(pendingSites, true);
+                showAlert("Sua solicitação foi enviada com sucesso!");
             }
         });
 
@@ -487,14 +479,12 @@
 
     function createTable(title) {
         const table = document.createElement("table");
-        table.style.borderCollapse = "collapse"; // Melhor aparência
+        table.style.borderCollapse = "collapse";
         table.style.border = "1px solid #ddd";
         table.style.width = "100%";
 
-        // Criar a linha do cabeçalho
         const headerRow = table.insertRow();
 
-        // Criar células do cabeçalho
         const siteHeader = document.createElement("th");
         siteHeader.textContent = title;
         siteHeader.style.color = "white";
@@ -625,7 +615,6 @@
         });
 
         document.body.appendChild(div);
-        // Fecha o aviso após 7 segundos
         setTimeout(() => div.remove(), 7000);
     }
 
@@ -651,7 +640,6 @@
         });
 
         document.body.appendChild(div);
-        // Fecha o aviso após 7 segundos
         setTimeout(() => div.remove(), 2000);
     }
 
@@ -824,6 +812,9 @@
 
     function checkUsageTime() {
         resetTimer();
+
+        console.log("Pending S: " + pendingSites.length)
+        console.log("Pending C: " + pendingChannels.length)
 
         if (isAdminPanelOpen){
             return;
