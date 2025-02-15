@@ -49,8 +49,9 @@
         const openCloseAdminPanelKey = "*";
         if (event.key === openCloseAdminPanelKey.toLowerCase() || event.key === openCloseAdminPanelKey.toUpperCase()) {
             if (!isAdminPanelOpen) {
-                const time = Math.max(0, maxUsageTime - GM_getValue("usageData").timeUsed);
-                endUserSession(time);
+                const remainingTime = getRemainingTime();
+                const infoTextContent =  remainingTime !== 0 ? `Tempo Restante: ${getRoundedTime(time)} ${getMinuteWord(time)}!` : "Sessão Expirada!";
+                endUserSession(infoTextContent);
             } else {
                 closeAdminPanelContainer();
                 location.reload();
@@ -63,7 +64,7 @@
             (event.key.toUpperCase() === showAdminContentKey && event.shiftKey)
         ) {
                 isAdmin = true;
-                endUserSession();
+                endUserSession("Admin Mode");
         }
 
         const showRemainingTimeKey = "t";
@@ -71,12 +72,20 @@
             (event.key.toLowerCase() === showRemainingTimeKey && event.shiftKey) ||
             (event.key.toUpperCase() === showRemainingTimeKey && event.shiftKey)
         ) {
-            const remainingTime = Math.max(maxUsageTime - GM_getValue("usageData").timeUsed, 0);
+            const remainingTime = getRoundedTime(getRemainingTime());
             displayRemainingTime(remainingTime, false);
         }
     });
 
     // Getters & Setters
+
+    function getRemainingTime() {
+        return Math.max(0, maxUsageTime - GM_getValue("usageData").timeUsed);
+    }
+
+    function getRoundedTime(time) {
+        return Math.round(time + 0.5);
+    }
 
     function getToday() {
         const today = new Date();
@@ -147,6 +156,8 @@
     // Create Html/Css
 
     function addRow(table, site, isPending, isSite) {
+        if (isPending && !isAdmin) return;
+
         const row = table.insertRow();
         const siteCell = row.insertCell(0);
         const actionCell = row.insertCell(1);
@@ -175,6 +186,11 @@
             siteCell.style.backgroundColor = "#ccffcc";
         }
 
+        actionCell.style.display = "flex";
+        actionCell.style.gap = "0 4px";
+        actionCell.style.justifyContent = "center";
+        actionCell.style.alignItems = "center";
+
         const addButton = document.createElement("button");
         addButton.textContent = "✔️";
         addButton.style.display = "none";
@@ -183,7 +199,7 @@
         addButton.style.color = "";
         addButton.style.cursor = "pointer";
         addButton.style.textShadow = "unset";
-        addButton.style.fontSize = "16px";
+        addButton.style.fontSize = "14px";
         addButton.onclick = () => {
             const { available, pending } = getAvailableContent(isSite);
             available.push(site);
@@ -201,7 +217,7 @@
         removeButton.style.color = "";
         removeButton.style.cursor = "pointer";
         removeButton.style.textShadow = "unset";
-        removeButton.style.fontSize = "16px";
+        removeButton.style.fontSize = "14px";
         removeButton.onclick = () => {
             const { available, pending } = getAvailableContent(isSite);
             if (isPending) {
@@ -233,7 +249,7 @@
         }
     }
 
-    function createAdminPasswordContainers(time) {
+    function createAdminPasswordContainers() {
         const adminPasswordDiv = document.createElement("div");
         Object.assign(adminPasswordDiv.style, {
             display: "flex",
@@ -242,7 +258,7 @@
             alignItems: "center",
             gap: "10px 0",
             width: "385px",
-            height: "75px",
+            height: "115px",
             border: "1px solid rgba(0, 0, 0, 0.3)",
             borderRadius: "2px",
             padding: "20px",
@@ -269,7 +285,7 @@
         passwordConfirmButton.addEventListener("click", () => {
             const password = passwordInput.value;
             if (isCorrectPassword(password)) {
-                alert("Login realizado com sucesso!");
+                showAlert("Login realizado com sucesso!");
                 sessionStorage.setItem("inputedPassword", password);
                 adminPasswordDiv.style.display = "none";
 
@@ -277,10 +293,10 @@
                 renderAllowedTable(allowedChannelsTable, false);
             } else {
                 if (password){
-                    alert("A senha inserida está incorreta!");
+                    showAlert("A senha inserida está incorreta!");
                     passwordInput.value = "";
                 } else {
-                    alert("Insira a senha antes de confimar!");
+                    showAlert("Insira a senha antes de confimar!");
                 }
             }
         });
@@ -332,22 +348,22 @@
             renderAllowedTable(allowedSitesTable, true);
             renderAllowedTable(allowedChannelsTable, false);
             if (!password) {
-                alert("Primeiro faça login como Administrador!")
+                showAlert("Primeiro faça login como Administrador!")
                 return;
             }
 
             if (!time) {
-                alert("Insira o tempo em minutos que deseja definir!");
+                showAlert("Insira o tempo em minutos que deseja definir!");
                 return;
             }
 
             if (isCorrectPassword(password)) {
-                alert(`Tempo definido para ${time} ${getMinuteWord(parseInt(time))}!`);
+                showAlert(`Tempo definido para ${time} ${getMinuteWord(parseInt(time))}!`);
                 resetTimer(time);
                 closeAdminPanelContainer(adminPanelContainer);
                 window.location.href = window.location.href;
             } else {
-                alert("Somente Administradores podem definir o tempo!");
+                showAlert("Somente Administradores podem definir o tempo!");
                 passwordInput.value = "";
                 timeInput.value = "";
             }
@@ -424,7 +440,8 @@
                 if (channelName) {
                     pendingChannels.push(`${channelName}`);
                     GM_setValue("pendingChannels", pendingChannels);
-                    location.reload();
+                    showAlert("Sua solicitação foi enviada com sucesso!");
+                    //location.reload();
                 }
             } else {
                 pendingSites.push(currentDomain);
@@ -480,11 +497,17 @@
         // Criar células do cabeçalho
         const siteHeader = document.createElement("th");
         siteHeader.textContent = title;
+        siteHeader.style.color = "white";
+        siteHeader.style.backgroundColor = "#04AA6D";
         siteHeader.style.padding = "8px";
         siteHeader.style.border = "1px solid #ddd";
-
+        
+        
         const actionsHeader = document.createElement("th");
         actionsHeader.textContent = "Ações";
+        actionsHeader.style.color = "white";
+        actionsHeader.style.backgroundColor = "#04AA6D";
+        actionsHeader.style.width = "100%";
         actionsHeader.style.padding = "8px";
         actionsHeader.style.display = "none";
         actionsHeader.style.border = "1px solid #ddd";
@@ -606,6 +629,32 @@
         setTimeout(() => div.remove(), 7000);
     }
 
+    function showAlert(message) {
+        const div = document.createElement("div");
+        div.textContent = message;
+
+        Object.assign(div.style, {
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            backgroundColor: "rgba(0, 0, 0, 1)",
+            color: "white",
+            border: "2px solid rgba(255, 255, 255, 0.2)",
+            borderRadius: "5px",
+            padding: "20px",
+            fontSize: "20px",
+            opacity: "1",
+            filter: "none",
+            mixBlendMode: "normal",
+            zIndex: "99999999999999999999999999999999",
+        });
+
+        document.body.appendChild(div);
+        // Fecha o aviso após 7 segundos
+        setTimeout(() => div.remove(), 2000);
+    }
+
     function renderAllowedTable(table, isSite) {
         const tds = table.getElementsByTagName("td");
 
@@ -618,7 +667,7 @@
         pending.forEach(site => addRow(table, site, true, isSite));
     }
 
-    function renderAdminPanel(time) {
+    function renderAdminPanel(infoTextContent) {
         isAdminPanelOpen = true;
 
         const adminPanelContainer = document.createElement("div");
@@ -648,15 +697,17 @@
             zIndex: "9999999999999999"
         });
 
-        const text = "Seu Tempo" + (time !== 0 ? `: ${Math.round(time + 0.5)} ${getMinuteWord(time)}!` : " Acabou!");
-        const { h2: infoText } = createH2(text, "0", "24px", "white");
+        const { h2: infoText } = createH2(infoTextContent, "0", "24px", "white");
         adminPanelContainer.appendChild(infoText);
 
-        const { adminPasswordDiv, passwordInput } = createAdminPasswordContainers(time);
+        const { adminPasswordDiv, passwordInput } = createAdminPasswordContainers();
         const { lanHouseContainer } = createLanHouseContainer(adminPanelContainer, passwordInput);
         const { solicitationContainer } = createSolicitationContainer();
-        const { allowedContainer: allowedSitesContainer } = createAllowedContainer(allowedSitesTable, "Sites Permitidos/Pendentes", allowedSitesTable, true);
-        const { allowedContainer: allowedChanellsContainer } = createAllowedContainer(allowedChannelsTable, "Canais Permitidos/Pendentes", allowedChannelsTable, false);
+
+        const allowedTextContent = "Permitidos" + (isAdmin ? " /Pendentes" : "" ) + ":";
+        const { allowedContainer: allowedSitesContainer } = createAllowedContainer(allowedSitesTable, `Sites ${allowedTextContent}`, allowedSitesTable, true);
+        const { allowedContainer: allowedChanellsContainer } = createAllowedContainer(allowedChannelsTable, `Canais ${allowedTextContent}`, allowedChannelsTable, false);
+
         const { div: inputsDiv } = createDiv("row", "30px 10px");
 
         const { div: adminDiv } = createDiv("column", "30px 10px");
@@ -746,14 +797,15 @@
 
     // Scripts
 
-    function endUserSession(time=0) {
+    function endUserSession(infoTextContent) {
         document.body.style.overflow = "hidden";
+        document.querySelectorAll('video, audio').forEach(el => el.pause());
         document.querySelectorAll('video, audio').forEach(el => el.remove());
-        renderAdminPanel(time);
+        renderAdminPanel(infoTextContent);
     }
 
     function checkDisplayRemainingTime(remainingTimeInMinutes) {
-        remainingTimeInMinutes = Math.round(remainingTimeInMinutes + 0.5);
+        remainingTimeInMinutes = getRoundedTime(remainingTimeInMinutes);
 
         if (remainingTimeInMinutes <= 30 && remainingTimeInMinutes > 29 && !warnings["30min"]) {
             displayRemainingTime(30);
@@ -792,7 +844,7 @@
         checkDisplayRemainingTime(remainingTimeInMinutes);
 
         if (remainingTimeInMinutes <= 0 && !isAuthorizedContent()) {
-            endUserSession();
+            endUserSession("Sessão Expirada!");
         }
     }
 
