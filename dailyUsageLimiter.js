@@ -444,18 +444,18 @@
         Object.assign(solicitationContainer.style, {
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
             alignItems: "center",
             gap: "20px 0",
             width: "800px",
             minHeight: "345px",
-            maxHeigth: "345px",
+            maxHeight: "345px",
             border: "1px solid rgba(0, 0, 0, 0.3)",
             borderRadius: "2px",
             padding: "20px",
             fontSize: "16px",
             backgroundColor: "#F5F5F5",
             color: "black",
+            overflow: "hidden"
         });
 
         const { div: solicitationIncludeDiv } = createDiv("column", "10px 0");
@@ -516,7 +516,7 @@
             justifyContent: "center",
             alignItems: "center",
             gap: "10px 0",
-            width: "100%"
+            width: "100%",
         });
 
         const { h2: allowedInfo } = createH2(`${textInfo}`, "0");
@@ -525,7 +525,7 @@
 
         const tableDiv = document.createElement("div");
         tableDiv.style.width = "100%";
-        tableDiv.style.height = "100px";
+        tableDiv.style.height = "300px";
         tableDiv.style.overflow = "hidden auto";
 
         tableDiv.appendChild(allowedTable);
@@ -538,7 +538,6 @@
     function createTable(title) {
         const table = document.createElement("table");
         table.style.borderCollapse = "collapse";
-        table.style.border = "1px solid #ddd";
         table.style.width = "100%";
 
         const headerRow = table.insertRow();
@@ -766,6 +765,8 @@
 
         const {div: allowedDiv } = createDiv("row", "30px 10px");
         allowedDiv.style.width = "100%"
+        allowedDiv.style.justifyContent = "start"
+        allowedDiv.style.alignItems = "start"
         allowedSitesContainer.style.flex = "1";
         allowedChanellsContainer.style.flex = "1";
 
