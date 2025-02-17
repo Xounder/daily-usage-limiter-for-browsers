@@ -52,6 +52,8 @@
     let isAdminPanelOpen = false;
     let isAdmin = false;
     let usageInterval;
+    let channelName;
+    let channelPath;
 
     window.addEventListener("beforeunload", () => {
         sessionStorage.removeItem("inputedPassword");
@@ -61,6 +63,9 @@
         const openCloseAdminPanelKey = "*";
         if (event.key === openCloseAdminPanelKey.toLowerCase() || event.key === openCloseAdminPanelKey.toUpperCase()) {
             if (!isAdminPanelOpen) {
+                if (window.location.href.includes("youtube.com")){
+                    getYoutubeChannel();
+                }
                 const remainingTime = getRemainingTime();
                 const infoTextContent = remainingTime !== 0 ? `Tempo Restante: ${getRoundedTime(remainingTime)} ${getMinuteWord(remainingTime)}!` : "Sessão Expirada!";
                 endUserSession(infoTextContent);
@@ -197,9 +202,9 @@
 
     function getYoutubeChannel() {
         const currentUrl = window.location.href;
-        let channelName = "";
-        let channelPath = "";
         let channelElement;
+        channelName = "";
+        channelPath = "";
 
         const ytb = "youtube.com"
         if (currentUrl.includes(`${ytb}/@`) || currentUrl.includes(`${ytb}/channel`)){
@@ -213,14 +218,12 @@
         } else {
             // modificar  caso mude o local para encontrar o nome do canal na visualização de videos
             channelElement = document.querySelector("ytd-channel-name yt-formatted-string a");
-            
+
             if (channelElement) {
                 channelName = channelElement.textContent.trim();
                 channelPath = channelElement.getAttribute("href");
             }
         }
-
-        return { channelName, channelPath };
     }
 
     // Create Html/Css
@@ -479,7 +482,6 @@
         solicitationContainer.appendChild(solicitationIncludeDiv);
 
         const currentDomain = window.location.origin;
-        const { channelName, channelPath } = getYoutubeChannel();
 
         const contentName = currentDomain.includes("youtube.com") ? channelName : currentDomain;
         if (isHideSolicitation(contentName)) {
@@ -815,7 +817,7 @@
     }
 
     function isAuthorizedChannel() {
-        let { channelName, channelPath } = getYoutubeChannel();
+        getYoutubeChannel();
         if (channelName) {
             return allowedChannels.some(channel => channel === channelName);
         }
@@ -833,9 +835,9 @@
     // Scripts
 
     function endUserSession(infoTextContent) {
+        document.body.replaceChildren();
         document.body.style.overflow = "hidden";
-        document.querySelectorAll('video, audio').forEach(el => el.pause());
-        document.querySelectorAll('video, audio').forEach(el => el.remove());
+        stopAllMedia();
         renderAdminPanel(infoTextContent);
     }
 
@@ -851,10 +853,31 @@
         });
     }
 
+    function stopAllMedia() {
+        document.querySelectorAll('audio').forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+        });
+
+        document.querySelectorAll('video').forEach(video => {
+            video.pause();
+            video.currentTime = 0;
+        });
+
+        document.querySelectorAll('[class*="miniplayer"], [id*="miniplayer"]').forEach(mini => {
+            mini.remove();
+        });
+
+        document.querySelectorAll('iframe').forEach(iframe => {
+            iframe.src = '';
+        });
+    }
+
     function checkUsageTime() {
         resetTimer();
 
         if (isAdminPanelOpen){
+            stopAllMedia();
             return;
         } else {
             isAdmin = false;
